@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开销记录</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f8f9fa; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .form-group { background: white; padding: 15px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        input, select, button { padding: 10px; margin: 5px; border-radius: 4px; border: 1px solid #ddd; }
+        button { cursor: pointer; background: #28a745; color: white; border: none; }
+        .btn-delete { background: #dc3545; padding: 5px 10px; font-size: 0.8rem; }
+        .btn-report { background: #17a2b8; width: 100%; margin-top: 20px; }
+        table { width: 100%; background: white; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border: 1px solid #eee; text-align: left; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <strong id="display-user">执行人: ---</strong>
+    <button onclick="location.href='index.html'" style="background:#6c757d">退出</button>
+</div>
+
+<div class="form-group">
+    <h3>新增开销</h3>
+    <select id="category">
+        <option value="娱乐">娱乐</option><option value="餐饮">餐饮</option>
+        <option value="日常用品">日常用品</option><option value="加油">加油</option>
+        <option value="文具">文具</option><option value="学校用品">学校用品</option>
+        <option value="账单">账单</option><option value="服装">服装</option>
+        <option value="电子产品">电子产品</option><option value="逛街">逛街</option>
+    </select>
+    <input type="number" id="amount" placeholder="金额">
+    <button id="add-btn">确认记录</button>
+</div>
+
+<table>
+    <thead>
+        <tr><th>时间</th><th>类别</th><th>金额</th><th>记录人</th><th>操作</th></tr>
+    </thead>
+    <tbody id="data-list"></tbody>
+</table>
+
+<button class="btn-report" id="report-btn">下载今日报告 (CSV)</button>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, serverTimestamp, where } 
+    from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+    // 填入你的 Firebase 配置
+    const firebaseConfig = {
+        apiKey: "AIzaSyDf7cIYAh41JxBZMODy2Az4ts1GnsKEqHM",
+        authDomain: "konghouse8888-60511.firebaseapp.com",
+        projectId: "konghouse8888-60511",
+        storageBucket: "konghouse8888-60511.firebasestorage.app",
+        messagingSenderId: "943199778056",
+        appId: "1:943199778056:web:688dd48183a9a1f039e8bd"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const currentUser = sessionStorage.getItem('currentUser');
+
+    if(!currentUser) { window.location.href = 'index.html'; }
+    document.getElementById('display-user').innerText = `执行人: ${currentUser}`;
+
+    // 渲染数据
+    async function loadData() {
+        const q = query(collection(db, "expenses"), orderBy("timestamp", "desc"));
+        const snapshot = await getDocs(q);
+        const list = document.getElementById('data-list');
+        list.innerHTML = '';
+        snapshot.forEach(docSnap => {
+            const d = docSnap.data();
+            const timeStr = d.timestamp ? d.timestamp.toDate().toLocaleString() : '...';
+            list.innerHTML += `
+                <tr>
+                    <td>${timeStr}</td>
+                    <td>${d.category}</td>
+                    <td>${d.amount}</td>
+                    <td>${d.user}</td>
+                    <td><button class="btn-delete" onclick="window.deleteItem('${docSnap.id}')">删除</button></td>
+                </tr>`;
+        });
+    }
+
+    // 添加数据
+    document.getElementById('add-btn').onclick = async () => {
+        const amt = document.getElementById('amount').value;
+        const cat = document.getElementById('category').value;
+        if(!amt) return alert('请输入金额');
+        
+        await addDoc(collection(db, "expenses"), {
+            category: cat,
+            amount: Number(amt),
+            user: currentUser,
+            timestamp: serverTimestamp(),
+            dateOnly: new Date().toISOString().split('T')[0] // 用于过滤今日报告
+        });
+        document.getElementById('amount').value = '';
+        loadData();
+    };
+
+    // 删除功能挂载到全局
+    window.deleteItem = async (id) => {
+        if(confirm('确定删除吗？')) {
+            await deleteDoc(doc(db, "expenses", id));
+            loadData();
+        }
+    };
+
+    // 下载报告
+    document.getElementById('report-btn').onclick = async () => {
+        const today = new Date().toISOString().split('T')[0];
+        const q = query(collection(db, "expenses"), where("dateOnly", "==", today));
+        const snapshot = await getDocs(q);
+        
+        let csv = "\uFEFF类别,金额,记录人,时间\n"; // \uFEFF 解决 Excel 中文乱码
+        snapshot.forEach(docSnap => {
+            const d = docSnap.data();
+            const t = d.timestamp ? d.timestamp.toDate().toLocaleString().replace(/,/g, ' ') : '';
+            csv += `${d.category},${d.amount},${d.user},${t}\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `报告_${today}.csv`;
+        link.click();
+    };
+
+    loadData();
+</script>
+</body>
+</html>
