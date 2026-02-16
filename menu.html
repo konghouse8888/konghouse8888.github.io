@@ -14,7 +14,6 @@
             --primary-color: #0984e3;
         }
 
-        /* 暗色模式变量 */
         [data-theme="dark"] {
             --bg-color: #1a1a1a;
             --card-bg: #2d2d2d;
@@ -36,7 +35,7 @@
         .btn-delete { background: #ff7675; color: white; border: none; padding: 5px 10px; border-radius: 4px; }
         
         #report-area { background: var(--card-bg); padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
         th, td { padding: 10px; border-bottom: 1px solid var(--border-color); text-align: left; }
         
         .total-section { margin-top: 20px; text-align: right; font-size: 1.3rem; font-weight: bold; color: #d63031; }
@@ -62,7 +61,7 @@
 </div>
 
 <div class="form-group">
-    <h3 style="margin-top:0;">📝 新增开销记录</h3>
+    <h3 style="margin-top:0;">📝 新增记录</h3>
     <select id="category">
         <option value="餐饮">餐饮</option><option value="娱乐">娱乐</option>
         <option value="日常用品">日常用品</option><option value="加油">加油</option>
@@ -70,8 +69,8 @@
         <option value="账单">账单</option><option value="服装">服装</option>
         <option value="电子产品">电子产品</option><option value="逛街">逛街</option>
     </select>
-    <input type="number" id="amount" placeholder="金额 (RM)" step="0.01">
-    <input type="text" id="note" placeholder="备注详情 (Note)">
+    <input type="number" id="amount" placeholder="金额 RM" step="0.01">
+    <input type="text" id="note" placeholder="备注 (Note)">
     <button class="btn-add" id="add-btn">确认保存</button>
 </div>
 
@@ -82,8 +81,8 @@
         <thead>
             <tr>
                 <th>时间</th>
-                <th>类别</th>
-                <th>详情</th>
+                <th>执行人</th> <th>类别</th>
+                <th>备注</th>
                 <th>金额</th>
                 <th class="no-print">操作</th>
             </tr>
@@ -95,14 +94,13 @@
     </div>
 </div>
 
-<button class="btn-png" id="download-png-btn">📸 生成 PNG 报表图片</button>
+<button class="btn-png" id="download-png-btn">📸 生成图片报告</button>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, serverTimestamp } 
     from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-    // 保持使用你的 Firebase 配置
     const firebaseConfig = {
         apiKey: "AIzaSyDf7cIYAh41JxBZMODy2Az4ts1GnsKEqHM",
         authDomain: "konghouse8888-60511.firebaseapp.com",
@@ -117,10 +115,9 @@
     const currentUser = sessionStorage.getItem('currentUser');
 
     if(!currentUser) { window.location.href = 'index.html'; }
-    document.getElementById('display-user').innerText = `执行人: ${currentUser}`;
+    document.getElementById('display-user').innerText = `当前执行人: ${currentUser}`;
     document.getElementById('report-date').innerText = `日期: ${new Date().toLocaleDateString()}`;
 
-    // --- 主题切换逻辑 ---
     window.toggleTheme = () => {
         const body = document.body;
         const newTheme = body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
@@ -129,82 +126,63 @@
     };
     if(localStorage.getItem('theme')) document.body.setAttribute('data-theme', localStorage.getItem('theme'));
 
-    // --- 加载数据 (不再使用 where 过滤，避免 Index 报错) ---
     async function loadData() {
         try {
             const q = query(collection(db, "expenses"), orderBy("timestamp", "desc"));
             const snapshot = await getDocs(q);
-            
             const list = document.getElementById('data-list');
-            const todayStr = new Date().toISOString().split('T')[0]; // 获取本地日期 yyyy-mm-dd
+            const todayStr = new Date().toISOString().split('T')[0];
             let total = 0;
             list.innerHTML = '';
 
             snapshot.forEach(docSnap => {
                 const d = docSnap.data();
-                
-                // 本地 JavaScript 过滤今日数据
                 if (d.dateOnly === todayStr) {
                     total += d.amount;
-                    
-                    // 时间显示逻辑
-                    let timeDisplay = "--:--";
-                    if (d.timestamp) {
-                        timeDisplay = d.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    } else {
-                        timeDisplay = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    }
+                    let timeStr = d.timestamp ? d.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     
                     list.innerHTML += `
                         <tr>
-                            <td>${timeDisplay}</td>
+                            <td>${timeStr}</td>
+                            <td style="color:var(--primary-color); font-weight:bold;">${d.user || '未知'}</td>
                             <td>${d.category}</td>
-                            <td style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${d.note || '-'}</td>
+                            <td>${d.note || '-'}</td>
                             <td style="font-weight:bold;">RM ${d.amount.toFixed(2)}</td>
                             <td class="no-print"><button class="btn-delete" onclick="window.deleteItem('${docSnap.id}')">删除</button></td>
                         </tr>`;
                 }
             });
             document.getElementById('total-amount').innerText = total.toFixed(2);
-        } catch (error) {
-            console.error("加载失败:", error);
-        }
+        } catch (e) { console.error(e); }
     }
 
-    // --- 保存记录 ---
     document.getElementById('add-btn').onclick = async () => {
         const btn = document.getElementById('add-btn');
         const amt = document.getElementById('amount').value;
         const cat = document.getElementById('category').value;
         const note = document.getElementById('note').value;
-        
         if(!amt) return alert('请输入金额');
         
         btn.disabled = true;
-        btn.innerText = "正在保存...";
-
+        btn.innerText = "保存中...";
         try {
             await addDoc(collection(db, "expenses"), {
                 category: cat,
                 amount: parseFloat(amt),
                 note: note,
-                user: currentUser,
+                user: currentUser, // 这里保存了是谁做的开销
                 timestamp: serverTimestamp(),
                 dateOnly: new Date().toISOString().split('T')[0]
             });
-            
             document.getElementById('amount').value = '';
             document.getElementById('note').value = '';
-            await loadData(); 
-        } catch (e) {
-            alert("保存失败: " + e.message);
+            await loadData();
         } finally {
             btn.disabled = false;
             btn.innerText = "确认保存";
         }
     };
 
-    // --- 删除记录 ---
     window.deleteItem = async (id) => {
         if(confirm('确定删除吗？')) {
             await deleteDoc(doc(db, "expenses", id));
@@ -212,19 +190,15 @@
         }
     };
 
-    // --- 截图并下载 ---
     document.getElementById('download-png-btn').onclick = function() {
         const noPrint = document.querySelectorAll('.no-print');
         noPrint.forEach(el => el.style.display = 'none');
-        
-        const area = document.querySelector("#report-area");
-        
-        html2canvas(area, {
+        html2canvas(document.querySelector("#report-area"), {
             backgroundColor: getComputedStyle(document.body).getPropertyValue('--card-bg'),
-            scale: 2 // 提升清晰度
+            scale: 2
         }).then(canvas => {
             const link = document.createElement('a');
-            link.download = `Family_Report_${new Date().toISOString().split('T')[0]}.png`;
+            link.download = `Report_${new Date().toISOString().split('T')[0]}.png`;
             link.href = canvas.toDataURL("image/png");
             link.click();
             noPrint.forEach(el => el.style.display = 'table-cell');
