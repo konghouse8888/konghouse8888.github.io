@@ -23,9 +23,9 @@
             --primary-color: #74b9ff;
         }
 
-        body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 20px; background: var(--bg-color); color: var(--text-color); transition: 0.3s; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .form-group { background: var(--card-bg); padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 10px; background: var(--bg-color); color: var(--text-color); transition: 0.3s; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .form-group { background: var(--card-bg); padding: 20px; border-radius: 10px; margin: 15px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         
         input, select, button { padding: 12px; margin: 5px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color); outline: none; }
         input[type="number"] { width: 110px; }
@@ -33,15 +33,20 @@
         
         .btn-add { background: #2ecc71; color: white; border: none; min-width: 100px; }
         .btn-add:disabled { background: #95a5a6; }
-        .btn-delete { background: #ff7675; color: white; border: none; padding: 5px 10px; }
+        .btn-delete { background: #ff7675; color: white; border: none; padding: 5px 10px; border-radius: 4px; }
         
-        #report-area { background: var(--card-bg); padding: 20px; border-radius: 8px; margin-top: 20px; border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); text-align: left; }
+        #report-area { background: var(--card-bg); padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        th, td { padding: 10px; border-bottom: 1px solid var(--border-color); text-align: left; }
         
         .total-section { margin-top: 20px; text-align: right; font-size: 1.3rem; font-weight: bold; color: #d63031; }
-        .theme-toggle { background: #636e72; color: white; border: none; padding: 8px 15px; }
-        .btn-png { background: var(--primary-color); color: white; border: none; width: 100%; margin-top: 15px; padding: 15px; font-size: 1rem; }
+        .theme-toggle { background: #636e72; color: white; border: none; padding: 8px 12px; }
+        .btn-png { background: var(--primary-color); color: white; border: none; width: 100%; margin-top: 15px; padding: 15px; font-size: 1rem; border-radius: 8px; }
+
+        @media (max-width: 600px) {
+            input, select { width: 100%; box-sizing: border-box; }
+            .header { flex-direction: column; gap: 10px; text-align: center; }
+        }
     </style>
 </head>
 <body data-theme="light">
@@ -51,7 +56,7 @@
         <span id="display-user" style="font-weight:bold; color:var(--primary-color);">执行人: 加载中...</span>
     </div>
     <div>
-        <button class="theme-toggle" onclick="toggleTheme()">🌓 开关暗色模式</button>
+        <button class="theme-toggle" onclick="toggleTheme()">🌓 模式切换</button>
         <button onclick="location.href='index.html'" style="background:#b2bec3; color:white; border:none;">退出</button>
     </div>
 </div>
@@ -72,14 +77,13 @@
 
 <div id="report-area">
     <h2 style="text-align:center; margin-bottom:5px;">家庭开销日报</h2>
-    <p id="report-date" style="text-align:center; opacity: 0.8;"></p>
+    <p id="report-date" style="text-align:center; opacity: 0.8; margin-bottom: 15px;"></p>
     <table>
         <thead>
             <tr>
                 <th>时间</th>
                 <th>类别</th>
-                <th>详情 (Note)</th>
-                <th>记录人</th>
+                <th>详情</th>
                 <th>金额</th>
                 <th class="no-print">操作</th>
             </tr>
@@ -91,13 +95,14 @@
     </div>
 </div>
 
-<button class="btn-png" id="download-png-btn">📸 生成 PNG 报表下载</button>
+<button class="btn-png" id="download-png-btn">📸 生成 PNG 报表图片</button>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, serverTimestamp, where } 
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, serverTimestamp } 
     from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
+    // 保持使用你的 Firebase 配置
     const firebaseConfig = {
         apiKey: "AIzaSyDf7cIYAh41JxBZMODy2Az4ts1GnsKEqHM",
         authDomain: "konghouse8888-60511.firebaseapp.com",
@@ -124,42 +129,49 @@
     };
     if(localStorage.getItem('theme')) document.body.setAttribute('data-theme', localStorage.getItem('theme'));
 
-    // --- 数据渲染逻辑 ---
+    // --- 加载数据 (不再使用 where 过滤，避免 Index 报错) ---
     async function loadData() {
-        const today = new Date().toISOString().split('T')[0];
-        const q = query(collection(db, "expenses"), where("dateOnly", "==", today), orderBy("timestamp", "desc"));
-        const snapshot = await getDocs(q);
-        
-        const list = document.getElementById('data-list');
-        let total = 0;
-        list.innerHTML = '';
+        try {
+            const q = query(collection(db, "expenses"), orderBy("timestamp", "desc"));
+            const snapshot = await getDocs(q);
+            
+            const list = document.getElementById('data-list');
+            const todayStr = new Date().toISOString().split('T')[0]; // 获取本地日期 yyyy-mm-dd
+            let total = 0;
+            list.innerHTML = '';
 
-        snapshot.forEach(docSnap => {
-            const d = docSnap.data();
-            total += d.amount;
-            
-            // 修复时间记录：如果服务器时间还没同步，显示本地当前时间
-            let timeDisplay = "--:--";
-            if (d.timestamp) {
-                timeDisplay = d.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            } else {
-                timeDisplay = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            }
-            
-            list.innerHTML += `
-                <tr>
-                    <td>${timeDisplay}</td>
-                    <td>${d.category}</td>
-                    <td>${d.note || '-'}</td>
-                    <td>${d.user}</td>
-                    <td style="font-weight:bold;">RM ${d.amount.toFixed(2)}</td>
-                    <td class="no-print"><button class="btn-delete" onclick="window.deleteItem('${docSnap.id}')">删除</button></td>
-                </tr>`;
-        });
-        document.getElementById('total-amount').innerText = total.toFixed(2);
+            snapshot.forEach(docSnap => {
+                const d = docSnap.data();
+                
+                // 本地 JavaScript 过滤今日数据
+                if (d.dateOnly === todayStr) {
+                    total += d.amount;
+                    
+                    // 时间显示逻辑
+                    let timeDisplay = "--:--";
+                    if (d.timestamp) {
+                        timeDisplay = d.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    } else {
+                        timeDisplay = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+                    
+                    list.innerHTML += `
+                        <tr>
+                            <td>${timeDisplay}</td>
+                            <td>${d.category}</td>
+                            <td style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${d.note || '-'}</td>
+                            <td style="font-weight:bold;">RM ${d.amount.toFixed(2)}</td>
+                            <td class="no-print"><button class="btn-delete" onclick="window.deleteItem('${docSnap.id}')">删除</button></td>
+                        </tr>`;
+                }
+            });
+            document.getElementById('total-amount').innerText = total.toFixed(2);
+        } catch (error) {
+            console.error("加载失败:", error);
+        }
     }
 
-    // --- 添加记录逻辑 ---
+    // --- 保存记录 ---
     document.getElementById('add-btn').onclick = async () => {
         const btn = document.getElementById('add-btn');
         const amt = document.getElementById('amount').value;
@@ -169,7 +181,7 @@
         if(!amt) return alert('请输入金额');
         
         btn.disabled = true;
-        btn.innerText = "处理中...";
+        btn.innerText = "正在保存...";
 
         try {
             await addDoc(collection(db, "expenses"), {
@@ -183,7 +195,7 @@
             
             document.getElementById('amount').value = '';
             document.getElementById('note').value = '';
-            await loadData(); // 重新加载列表
+            await loadData(); 
         } catch (e) {
             alert("保存失败: " + e.message);
         } finally {
@@ -192,6 +204,7 @@
         }
     };
 
+    // --- 删除记录 ---
     window.deleteItem = async (id) => {
         if(confirm('确定删除吗？')) {
             await deleteDoc(doc(db, "expenses", id));
@@ -199,19 +212,19 @@
         }
     };
 
+    // --- 截图并下载 ---
     document.getElementById('download-png-btn').onclick = function() {
         const noPrint = document.querySelectorAll('.no-print');
         noPrint.forEach(el => el.style.display = 'none');
         
-        // 针对暗色模式的截图优化：确保截图时背景是白色或符合主题
         const area = document.querySelector("#report-area");
         
         html2canvas(area, {
-            backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--card-bg'),
-            scale: 2 // 提高清晰度
+            backgroundColor: getComputedStyle(document.body).getPropertyValue('--card-bg'),
+            scale: 2 // 提升清晰度
         }).then(canvas => {
             const link = document.createElement('a');
-            link.download = `家庭报告_${new Date().toLocaleDateString()}.png`;
+            link.download = `Family_Report_${new Date().toISOString().split('T')[0]}.png`;
             link.href = canvas.toDataURL("image/png");
             link.click();
             noPrint.forEach(el => el.style.display = 'table-cell');
