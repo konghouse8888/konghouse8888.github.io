@@ -2,41 +2,66 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>家庭开销系统 - 登录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KONG HOUSE - 登录</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             margin: 0; height: 100vh; display: flex; justify-content: center; align-items: center;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Segoe UI', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
         .login-card {
-            background: rgba(255, 255, 255, 0.9); padding: 40px; border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.2); width: 320px; text-align: center;
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px 25px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 350px;
+            text-align: center;
+            backdrop-filter: blur(15px);
         }
-        h2 { color: #4834d4; margin-bottom: 25px; }
-        input {
-            width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd;
-            border-radius: 8px; box-sizing: border-box; font-size: 1rem;
+        h2 { color: #4834d4; margin: 0 0 20px 0; font-size: 1.8rem; letter-spacing: 1px; }
+        input[type="text"], input[type="password"] {
+            width: 100%; padding: 15px; margin: 12px 0;
+            border: 2px solid #eee; border-radius: 12px;
+            font-size: 16px; /* 防止 iOS 自动放大 */
+            transition: 0.3s; background: #f9f9f9;
         }
+        input:focus { border-color: #4834d4; outline: none; background: #fff; }
+        
+        /* 修复记住密码 UI */
+        .remember-container {
+            display: flex; align-items: center; justify-content: flex-start;
+            margin: 10px 0 20px 5px; cursor: pointer;
+        }
+        .remember-container input {
+            width: 20px; height: 20px; margin-right: 10px; cursor: pointer;
+        }
+        .remember-container label {
+            font-size: 0.95rem; color: #555; cursor: pointer; user-select: none;
+        }
+
         button {
-            width: 100%; padding: 12px; background: #4834d4; color: white;
-            border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;
-            font-weight: bold; transition: 0.3s; margin-top: 15px;
+            width: 100%; padding: 16px; background: #4834d4; color: white;
+            border: none; border-radius: 12px; cursor: pointer; font-size: 1.1rem;
+            font-weight: bold; transition: 0.3s;
+            box-shadow: 0 4px 15px rgba(72, 52, 212, 0.3);
         }
-        button:hover { background: #686de0; transform: translateY(-2px); }
-        .remember { display: flex; align-items: center; font-size: 0.9rem; color: #666; gap: 5px; margin-top: 10px; }
+        button:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
     <div class="login-card">
         <h2>KONG HOUSE</h2>
-        <input type="text" id="username" placeholder="请输入名字 (如: BABA)">
-        <input type="password" id="password" placeholder="请输入密码">
-        <div class="remember">
-            <input type="checkbox" id="remember"> <label for="remember">记住密码</label>
-        </div>
+        <input type="text" id="username" placeholder="名字 (如: BABA)" autocomplete="username">
+        <input type="password" id="password" placeholder="密码" autocomplete="current-password">
+        
+        <label class="remember-container">
+            <input type="checkbox" id="remember">
+            <span>记住密码</span>
+        </label>
+
         <button onclick="handleLogin()">登 录</button>
     </div>
 
@@ -55,6 +80,8 @@
             const uInput = document.getElementById('username').value.trim().toUpperCase();
             const pInput = document.getElementById('password').value.trim();
 
+            if(!uInput || !pInput) return alert("请完整填写");
+
             try {
                 const res = await fetch('keys.txt', { cache: 'no-cache' });
                 const text = await res.text();
@@ -64,14 +91,10 @@
                 for (let line of lines) {
                     const cleanLine = line.trim();
                     if (!cleanLine) continue;
-                    // 同时兼容英文冒号 : 和中文冒号 ：
                     const parts = cleanLine.includes(':') ? cleanLine.split(':') : cleanLine.split('：');
                     if (parts.length === 2) {
-                        const fileU = parts[0].trim().toUpperCase();
-                        const fileP = parts[1].trim();
-                        if (uInput === fileU && pInput === fileP) {
-                            found = true;
-                            break;
+                        if (uInput === parts[0].trim().toUpperCase() && pInput === parts[1].trim()) {
+                            found = true; break;
                         }
                     }
                 }
@@ -81,15 +104,16 @@
                         localStorage.setItem('hk_u', uInput);
                         localStorage.setItem('hk_p', pInput);
                     } else {
-                        localStorage.clear();
+                        localStorage.removeItem('hk_u');
+                        localStorage.removeItem('hk_p');
                     }
                     sessionStorage.setItem('currentUser', uInput);
                     window.location.href = 'menu.html';
                 } else {
-                    alert("登录失败：账号或密码不匹配");
+                    alert("姓名或密码错误");
                 }
             } catch (e) {
-                alert("读取验证文件失败，请确保 keys.txt 在根目录");
+                alert("无法连接服务器");
             }
         }
     </script>
