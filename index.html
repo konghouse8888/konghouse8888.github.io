@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭开销系统 - 登录</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
+        .login-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 300px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .remember-me { font-size: 0.9rem; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>家庭开销登录</h2>
+        <input type="text" id="username" placeholder="账号">
+        <input type="password" id="password" placeholder="密码">
+        <div class="remember-me">
+            <input type="checkbox" id="remember" style="width: auto;"> 保存密码
+        </div>
+        <button onclick="handleLogin()">登录</button>
+    </div>
+
+    <script>
+        // 自动填充保存的密码
+        window.onload = () => {
+            const savedU = localStorage.getItem('hk_u');
+            const savedP = localStorage.getItem('hk_p');
+            if(savedU && savedP) {
+                document.getElementById('username').value = savedU;
+                document.getElementById('password').value = savedP;
+                document.getElementById('remember').checked = true;
+            }
+        };
+
+        async function handleLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const remember = document.getElementById('remember').checked;
+
+            try {
+                const response = await fetch('keys.txt');
+                const text = await response.text();
+                const lines = text.split('\n');
+                let isValid = false;
+
+                for(let line of lines) {
+                    const [fileU, fileP] = line.trim().split(':');
+                    if(u === fileU && p === fileP) {
+                        isValid = true;
+                        break;
+                    }
+                }
+
+                if(isValid) {
+                    if(remember) {
+                        localStorage.setItem('hk_u', u);
+                        localStorage.setItem('hk_p', p);
+                    } else {
+                        localStorage.removeItem('hk_u');
+                        localStorage.removeItem('hk_p');
+                    }
+                    sessionStorage.setItem('currentUser', u);
+                    window.location.href = 'menu.html';
+                } else {
+                    alert('账号或密码错误！');
+                }
+            } catch (e) {
+                alert('读取验证文件失败，请确保 keys.txt 存在。');
+            }
+        }
+    </script>
+</body>
+</html>
